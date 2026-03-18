@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventario</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0D1117;--surface:#161B22;--surface2:#21262D;--surface3:#30363D;
+  --navy:#1C2B3A;--accent:#D4A84B;--accent2:#B8902F;
+  --green:#3FB950;--red:#F85149;--yellow:#D29922;--orange:#F0883E;
+  --border:#30363D;--border2:#484F58;--text:#E6EDF3;--muted:#8B949E;
+  --radius:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+/* SETUP */
+#setup-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;padding:1.5rem}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:2rem;width:100%;max-width:500px}
+.setup-logo{font-size:30px;margin-bottom:1rem}
+.setup-title{font-size:19px;font-weight:600;color:var(--text);margin-bottom:5px}
+.setup-sub{font-size:13px;color:var(--muted);margin-bottom:1.4rem;line-height:1.6}
+.setup-step{display:flex;gap:11px;margin-bottom:9px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px}
+.s-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#000;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.s-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.s-desc{font-size:12px;color:var(--muted);line-height:1.5}
+.s-desc code{background:var(--surface3);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+.url-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:9px 13px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;margin-top:6px}
+.url-input:focus{border-color:var(--accent)}
+.url-input::placeholder{color:var(--muted)}
+.btn-connect{width:100%;padding:11px;background:var(--accent);color:#000;border:none;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;transition:.15s}
+.btn-connect:hover{background:var(--accent2)}
+.skip-link{display:block;text-align:center;margin-top:9px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline}
+/* LOADING */
+#loading{position:fixed;inset:0;background:rgba(13,17,23,.88);z-index:400;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#loading.show{display:flex}
+.spinner{width:30px;height:30px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace}
+/* HEADER */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.4rem;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:32px;height:32px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.logo-text{font-size:14px;font-weight:600;letter-spacing:.04em}
+.logo-sub{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px}
+.hdr-right{display:flex;align-items:center;gap:9px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:.3s}
+.conn-dot.on{background:var(--green);box-shadow:0 0 5px var(--green)}
+.conn-dot.err{background:var(--red)}
+.conn-lbl{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.btn-sync{padding:4px 11px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-sync:hover{color:var(--text);border-color:var(--border2)}
+/* LAYOUT */
+.app{display:flex;height:calc(100vh - 56px)}
+nav{width:215px;min-width:215px;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:.8rem 0}
+.nav-section{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--muted);padding:.7rem 1.1rem .3rem;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 1.1rem;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-left:2px solid transparent;transition:.15s}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(212,168,75,.07)}
+.nav-icon{font-size:13px;width:17px;text-align:center}
+.nav-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;padding:1px 5px;border-radius:6px}
+.nb-gray{background:var(--surface3);color:var(--muted)}
+.nb-red{background:rgba(248,81,73,.2);color:var(--red)}
+.nb-amber{background:rgba(212,168,75,.2);color:var(--accent)}
+main{flex:1;overflow-y:auto;padding:1.4rem}
+.view{display:none}
+.view.active{display:block}
+/* PAGE HEADER */
+.ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.1rem;flex-wrap:wrap;gap:9px}
+.ph-title{font-size:19px;font-weight:600}
+.ph-sub{font-size:12px;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace}
+/* BUTTONS */
+.btn{padding:6px 13px;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:5px;transition:.15s}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-success{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.btn-danger{background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.25)}
+.btn-sm{padding:3px 9px;font-size:11px}
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-bottom:1.1rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px}
+.stat-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:600}
+.sv-gold{color:var(--accent)}.sv-green{color:var(--green)}.sv-red{color:var(--red)}.sv-yellow{color:var(--yellow)}
+/* SEARCH */
+.search-bar{display:flex;gap:7px;margin-bottom:.9rem;flex-wrap:wrap}
+.search-input{flex:1;min-width:170px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:7px 11px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--muted)}
+/* MODELO CARD */
+.modelo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.9rem;overflow:hidden}
+.modelo-header{background:var(--surface2);padding:9px 13px;display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.modelo-nombre{font-size:12px;font-weight:600;flex:1;color:var(--text)}
+.modelo-meta{display:flex;gap:5px;flex-wrap:wrap}
+.meta-chip{font-family:'DM Mono',monospace;font-size:10px;background:var(--surface3);padding:2px 7px;border-radius:4px;color:var(--muted)}
+.meta-gold{background:rgba(212,168,75,.15);color:var(--accent)}
+.modelo-body{padding:11px}
+.tallas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.genero-block{background:var(--surface2);border-radius:7px;padding:9px;border:1px solid var(--border)}
+.genero-title{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;font-family:'DM Mono',monospace}
+.tallas-table{width:100%;border-collapse:collapse;font-size:12px}
+.tallas-table th{text-align:center;padding:4px 6px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--border)}
+.tallas-table td{text-align:center;padding:4px 6px;border-bottom:1px solid var(--border)}
+.tallas-table tr:last-child td{border-bottom:none}
+.tallas-table tr.tr-total td{font-weight:600;border-top:1px solid var(--border2);background:var(--surface3);font-size:11px}
+.ex-val{font-weight:600;font-family:'DM Mono',monospace;font-size:12px}
+.ex-zero{color:var(--red)}.ex-low{color:var(--yellow)}.ex-ok{color:var(--green)}.ex-none{color:var(--muted)}
+/* INLINE EDIT/DELETE BUTTONS */
+.row-actions{display:flex;align-items:center;gap:3px}
+.ib-edit{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px;transition:.15s;line-height:1}
+.ib-edit:hover{color:var(--accent);background:rgba(212,168,75,.1)}
+.ib-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px;transition:.15s;line-height:1}
+.ib-del:hover{color:var(--red);background:rgba(248,81,73,.1)}
+.stock-cell{display:flex;align-items:center;justify-content:center;gap:3px}
+/* SIMPLE TABLE */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:.9rem}
+.table-toolbar{display:flex;align-items:center;gap:7px;padding:9px 11px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 11px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2);text-transform:uppercase;white-space:nowrap}
+td{padding:7px 11px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;font-family:'DM Mono',monospace}
+.b-ok{background:rgba(63,185,80,.15);color:var(--green)}.b-warn{background:rgba(210,153,34,.15);color:var(--yellow)}
+.b-danger{background:rgba(248,81,73,.15);color:var(--red)}.b-cat{background:rgba(212,168,75,.12);color:var(--accent)}.b-none{background:var(--surface3);color:var(--muted)}
+/* PRODUCT THUMB */
+.prod-thumb{width:34px;height:34px;border-radius:5px;object-fit:cover;border:1px solid var(--border);vertical-align:middle;background:var(--surface3)}
+.prod-thumb-placeholder{width:34px;height:34px;border-radius:5px;border:1px solid var(--border);background:var(--surface3);display:inline-flex;align-items:center;justify-content:center;font-size:16px;vertical-align:middle}
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.lbl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:.05em}
+.fi{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 11px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:100%;transition:.15s}
+.fi:focus{border-color:var(--accent)}
+textarea.fi{resize:vertical;min-height:55px}
+/* EDIT MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:1.3rem}
+.modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem}
+.modal-title{font-size:14px;font-weight:600;line-height:1.4;flex:1;margin-right:10px}
+.modal-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;flex-shrink:0}
+.modal-close:hover{color:var(--text)}
+/* IMAGE UPLOAD */
+.img-preview{width:100%;height:150px;background:var(--surface2);border:2px dashed var(--border);border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;margin-bottom:10px;cursor:pointer;transition:.2s}
+.img-preview:hover{border-color:var(--accent)}
+.img-preview img{width:100%;height:100%;object-fit:cover}
+.img-placeholder{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--muted)}
+.img-placeholder span{font-size:26px}
+.img-placeholder p{font-size:12px}
+.img-tabs{display:flex;gap:4px;margin-bottom:8px}
+.img-tab{padding:4px 11px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--muted);transition:.15s}
+.img-tab.active{background:var(--accent);color:#000;border-color:var(--accent)}
+/* DRAFT */
+.draft-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px;margin-bottom:7px;display:flex;align-items:flex-start;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.draft-title{font-weight:600;font-size:13px}
+.draft-meta{font-size:11px;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace}
+/* TOAST */
+#toast{position:fixed;bottom:1.2rem;right:1.2rem;z-index:999;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 15px;font-size:13px;display:none;align-items:center;gap:8px;color:var(--text)}
+#toast.show{display:flex}
+#toast.ok{border-color:var(--green)}
+#toast.warn{border-color:var(--yellow)}
+#toast.err{border-color:var(--red)}
+/* MISC */
+hr{border:none;border-top:1px solid var(--border);margin:.9rem 0}
+.safe-banner{background:rgba(212,168,75,.07);border:1px solid rgba(212,168,75,.2);border-radius:var(--radius);padding:9px 13px;margin-bottom:1rem;font-size:13px;display:flex;align-items:flex-start;gap:7px}
+.no-results{padding:2rem;text-align:center;color:var(--muted);font-size:13px}
+.section-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:.6rem}
+code{background:var(--surface3);padding:1px 5px;border-radius:4px;font-size:11px;font-family:'DM Mono',monospace;color:var(--accent)}
+@media(max-width:680px){nav{display:none}.tallas-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">🧥</div>
+    <div class="setup-title">Inventario — Configuración inicial</div>
+    <div class="setup-sub">Conecta la app a tu Google Sheets para compartir datos en tiempo real. Solo se hace una vez.</div>
+    <div class="setup-step"><div class="s-num">1</div><div><div class="s-title">Crea las pestañas en tu Google Sheet</div><div class="s-desc">Dentro de tu inventario crea 3 pestañas: <code>productos</code> <code>movimientos</code> <code>borradores</code></div></div></div>
+    <div class="setup-step"><div class="s-num">2</div><div><div class="s-title">Pega el script en Apps Script</div><div class="s-desc">Extensiones → Apps Script → pega el archivo <code>google-apps-script.js</code> → Guardar</div></div></div>
+    <div class="setup-step"><div class="s-num">3</div><div><div class="s-title">Publica como aplicación web</div><div class="s-desc">Implementar → Nueva implementación → Aplicación web → Ejecutar como: Yo · Acceso: Cualquier usuario → copia la URL</div></div></div>
+    <div class="setup-step"><div class="s-num">4</div><div><div class="s-title">Pega la URL aquí</div><div class="s-desc"><input class="url-input" id="api-url-input" value="https://script.google.com/macros/s/AKfycbzaGyAZ1K62Vfzm2Nu3J1wRNDQePWFvakN0_eIMurpIs8BD1yLCZMjKrCZSmcJaCwPihw/exec" placeholder="https://script.google.com/macros/s/…/exec"></div></div></div>
+    <button class="btn-connect" onclick="connectAPI()">Conectar y cargar inventario →</button>
+    <span class="skip-link" onclick="skipSetup()">Usar sin conexión (datos del inventario)</span>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading"><div class="spinner"></div><div class="loading-text" id="loading-text">Cargando…</div></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">🧥</div>
+    <div><div class="logo-text">INVENTARIO</div><div class="logo-sub" id="conn-sub">Sin conexión</div></div>
+  </div>
+  <div class="hdr-right">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span class="conn-lbl" id="conn-lbl">—</span>
+    <button class="btn-sync" onclick="syncSheets()" title="Sincronizar con Sheets">⟳ Sync</button><button class="btn-sync" onclick="uploadAllToSheets()" title="Subir todos los datos a Sheets" style="margin-left:4px">⬆ Subir datos</button>
+  </div>
+</header>
+
+<div class="app">
+<nav>
+  <div class="nav-section">Inventario</div>
+  <div class="nav-item active" onclick="showView('filipinas')"><span class="nav-icon">👔</span>Filipinas<span class="nav-badge nb-gray">14</span></div>
+  <div class="nav-item" onclick="showView('pants')"><span class="nav-icon">👖</span>Pants & Pantalones<span class="nav-badge nb-gray">11</span></div>
+  <div class="nav-item" onclick="showView('camisas')"><span class="nav-icon">👕</span>Camisas & Blusas<span class="nav-badge nb-gray">5</span></div>
+  <div class="nav-item" onclick="showView('mandiles')"><span class="nav-icon">🧥</span>Mandiles<span class="nav-badge nb-gray">21</span></div>
+  <div class="nav-item" onclick="showView('accesorios')"><span class="nav-icon">🎩</span>Accesorios<span class="nav-badge nb-gray">15</span></div>
+  <div class="nav-item" onclick="showView('insumos')"><span class="nav-icon">🔩</span>Insumos<span class="nav-badge nb-gray">3</span></div>
+  <div class="nav-section">Gestión</div>
+  <div class="nav-item" onclick="showView('actualizar')"><span class="nav-icon">✎</span>Actualizar Stock</div>
+  <div class="nav-item" onclick="showView('borradores')"><span class="nav-icon">⏳</span>Borradores<span class="nav-badge nb-amber" id="nc-bor" style="display:none"></span></div>
+  <div class="nav-item" onclick="showView('alertas')"><span class="nav-icon">🚨</span>Alertas<span class="nav-badge nb-red" id="nc-alr">0</span></div>
+  <div class="nav-item" onclick="showView('resumen')"><span class="nav-icon">📊</span>Resumen</div>
+</nav>
+
+<main>
+  <!-- FILIPINAS -->
+  <div class="view active" id="view-filipinas">
+    <div class="ph"><div><div class="ph-title">👔 Filipinas</div><div class="ph-sub">14 modelos · Estante 6 & 7</div></div></div>
+    <div class="stats" id="stats-fil"></div>
+    <div class="search-bar"><input class="search-input" id="search-fil" placeholder="Buscar modelo…" oninput="renderFilipinas(this.value)"></div>
+    <div id="filipinas-container"></div>
+  </div>
+  <!-- PANTS -->
+  <div class="view" id="view-pants">
+    <div class="ph"><div><div class="ph-title">👖 Pants & Pantalones</div><div class="ph-sub">11 modelos</div></div></div>
+    <div class="stats" id="stats-pan"></div>
+    <div class="search-bar"><input class="search-input" id="search-pan" placeholder="Buscar modelo…" oninput="renderPants(this.value)"></div>
+    <div id="pants-container"></div>
+  </div>
+  <!-- CAMISAS -->
+  <div class="view" id="view-camisas">
+    <div class="ph"><div><div class="ph-title">👕 Camisas & Blusas</div><div class="ph-sub">5 modelos</div></div></div>
+    <div class="stats" id="stats-cam"></div>
+    <div id="camisas-container"></div>
+  </div>
+  <!-- MANDILES -->
+  <div class="view" id="view-mandiles">
+    <div class="ph"><div><div class="ph-title">🧥 Mandiles</div><div class="ph-sub">21 modelos · Talla única</div></div></div>
+    <div class="stats" id="stats-man"></div>
+    <div class="table-wrap"><table><thead><tr><th></th><th>Modelo</th><th>Existencias</th><th>Última act.</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="mandiles-tbody"></tbody></table></div>
+  </div>
+  <!-- ACCESORIOS -->
+  <div class="view" id="view-accesorios">
+    <div class="ph"><div><div class="ph-title">🎩 Accesorios</div><div class="ph-sub">15 artículos · Talla única</div></div></div>
+    <div class="stats" id="stats-acc"></div>
+    <div class="table-wrap"><table><thead><tr><th></th><th>Artículo</th><th>Existencias</th><th>Última act.</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="accesorios-tbody"></tbody></table></div>
+  </div>
+  <!-- INSUMOS -->
+  <div class="view" id="view-insumos">
+    <div class="ph"><div><div class="ph-title">🔩 Insumos</div><div class="ph-sub">Botones · Act. 16/02/2026</div></div></div>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Nombre</th><th>Stock</th><th>Estado</th><th>Notas</th><th>Acciones</th></tr></thead><tbody id="insumos-tbody"></tbody></table></div>
+  </div>
+  <!-- ACTUALIZAR -->
+  <div class="view" id="view-actualizar">
+    <div class="ph"><div><div class="ph-title">✎ Actualizar Stock</div><div class="ph-sub">Los cambios pasan a Borradores antes de confirmar</div></div></div>
+    <div class="safe-banner">🛡️<div><strong style="color:var(--accent)">Modo seguro.</strong> Cada cambio se guarda como borrador. Un supervisor confirma antes de afectar el inventario oficial.</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem">
+      <div class="form-grid">
+        <div class="form-group"><label class="lbl">TIPO</label><select class="fi" id="mov-tipo" onchange="calcResultado()"><option value="entrada">📦 Entrada</option><option value="salida">🛍️ Salida</option><option value="ajuste">🔧 Ajuste</option><option value="devolucion">↩️ Devolución</option></select></div>
+        <div class="form-group"><label class="lbl">FECHA</label><input type="date" class="fi" id="mov-fecha"></div>
+        <div class="form-group full"><label class="lbl">PRODUCTO</label><select class="fi" id="mov-prod" onchange="autoFill()"><option value="">— Seleccionar —</option></select></div>
+        <div class="form-group"><label class="lbl">CATEGORÍA</label><input class="fi" id="mov-cat" readonly style="opacity:.5"></div>
+        <div class="form-group"><label class="lbl">TALLA</label><input class="fi" id="mov-talla-in" readonly style="opacity:.5"></div>
+        <div class="form-group"><label class="lbl">CANTIDAD</label><input type="number" class="fi" id="mov-qty" min="1" placeholder="0" oninput="calcResultado()"></div>
+        <div class="form-group"><label class="lbl">STOCK ACTUAL</label><input class="fi" id="mov-actual" readonly style="opacity:.5"></div>
+        <div class="form-group"><label class="lbl">STOCK RESULTANTE</label><input class="fi" id="mov-result" readonly style="opacity:.5;font-weight:700"></div>
+        <div class="form-group full"><label class="lbl">MOTIVO / NOTA</label><textarea class="fi" id="mov-nota" rows="2" placeholder="Compra, venta, ajuste físico…"></textarea></div>
+        <div class="form-group full"><label class="lbl">RESPONSABLE</label><input class="fi" id="mov-resp" placeholder="Nombre de quien registra"></div>
+      </div>
+      <hr>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="clearForm()">Limpiar</button>
+        <button class="btn btn-primary" onclick="saveDraft()">Guardar borrador →</button>
+      </div>
+    </div>
+  </div>
+  <!-- BORRADORES -->
+  <div class="view" id="view-borradores">
+    <div class="ph"><div><div class="ph-title">⏳ Borradores</div><div class="ph-sub">Confirma o descarta antes de aplicar al inventario</div></div></div>
+    <div id="borradores-container"></div>
+  </div>
+  <!-- ALERTAS -->
+  <div class="view" id="view-alertas">
+    <div class="ph"><div><div class="ph-title">🚨 Alertas de Stock</div><div class="ph-sub">Agotados o bajo mínimo</div></div></div>
+    <div id="alertas-container"></div>
+  </div>
+  <!-- RESUMEN -->
+  <div class="view" id="view-resumen">
+    <div class="ph"><div><div class="ph-title">📊 Resumen General</div><div class="ph-sub">Vista consolidada de todo el inventario</div></div></div>
+    <div class="stats" id="stats-resumen"></div>
+    <div class="table-wrap"><table><thead><tr><th>Categoría</th><th>Modelos</th><th>Total Piezas</th><th>Sin Stock</th><th>Bajo Mínimo</th></tr></thead><tbody id="resumen-tbody"></tbody></table></div>
+  </div>
+</main>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Editar producto</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <!-- Imagen -->
+    <div class="img-tabs">
+      <div class="img-tab active" id="tab-url" onclick="switchTab('url')">🔗 URL</div>
+      <div class="img-tab" id="tab-up" onclick="switchTab('up')">⬆ Subir archivo</div>
+    </div>
+    <div class="img-preview" id="img-preview" onclick="document.getElementById('img-file').click()">
+      <div class="img-placeholder"><span>🖼</span><p>Haz clic para subir imagen</p></div>
+    </div>
+    <input type="file" id="img-file" accept="image/*" style="display:none" onchange="handleUpload(this)">
+    <div id="url-section" class="form-group" style="margin-bottom:10px">
+      <label class="lbl">URL DE IMAGEN (Google Drive, internet…)</label>
+      <input class="fi" id="e-img" placeholder="https://drive.google.com/... o cualquier URL" oninput="updatePreview()">
+    </div>
+    <hr>
+    <div class="form-grid">
+      <div class="form-group"><label class="lbl">CÓDIGO</label><input class="fi" id="e-cod"></div>
+      <div class="form-group"><label class="lbl">CATEGORÍA</label><select class="fi" id="e-cat"><option>Filipina</option><option>Pants / Pantalon</option><option>Camisa / Blusa</option><option>Mandil</option><option>Accesorio</option><option>Insumo</option></select></div>
+      <div class="form-group full"><label class="lbl">NOMBRE / MODELO</label><input class="fi" id="e-nom"></div>
+      <div class="form-group"><label class="lbl">TALLA</label><input class="fi" id="e-tal"></div>
+      <div class="form-group"><label class="lbl">GÉNERO</label><select class="fi" id="e-gen"><option>Caballero</option><option>Dama</option><option>Unisex</option><option>N/A</option></select></div>
+      <div class="form-group"><label class="lbl">EXISTENCIAS</label><input type="number" class="fi" id="e-ex" min="0"></div>
+      <div class="form-group"><label class="lbl">MÍNIMO ALERTA</label><input type="number" class="fi" id="e-min" min="0"></div>
+      <div class="form-group full"><label class="lbl">NOTAS / UBICACIÓN</label><input class="fi" id="e-nota"></div>
+    </div>
+    <hr>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-danger" onclick="deleteFromModal()">🗑 Eliminar</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveModal()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const FILIPINAS=[
+  {nombre:"Filipina BAJA de Trabajo, M/L, BLANCA, Botonadura Visible",codigo:"FGTL01",estante:"Estante 6",fecha:"01/01/2026",ultMod:"07/01/2026",cab:{tallas:[24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[null,7,null,6,39,20,19,0,20,14,28,26,18,10,8,5,null]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[11,11,14,22,26,4,13,3,33,0,8,13,2,12,0,0]}},
+  {nombre:"Filipina GUS, BROCHE, M/L, Cuello Cruzado, Blanca, Botonadura Oculta",codigo:"",estante:"Estante 7",fecha:"???",ultMod:"27/01/2026",cab:{tallas:[24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[10,13,4,16,11,23,23,0,17,27,12,4,16,15,4,15,17]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52],exist:[3,8,4,1,0,11,13,23,16,27,12,20,18,19,9,9,5]}},
+  {nombre:"Filipina Baja California, Blanca, Bies Azul, M/L, Transpiración",codigo:"",estante:"Estante 6",fecha:"???",ultMod:"14/03/2026",cab:{tallas:[24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[8,7,13,19,29,13,11,2,6,15,15,19,10,0,13,11,15]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[26,21,44,8,29,2,25,57,22,29,19,11,11,11,12,0]}},
+  {nombre:"Filipina BAJA CALIFORNIA, BROCHE, M/L, Cuello Cuadrado, Blanca, Broche Oculto",codigo:"",estante:"Estante 6",fecha:"01/01/2026",ultMod:"13/01/2026",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[10,12,27,10,22,0,0,0,0,0,5,12,1,10,0,4]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[14,18,23,21,16,8,1,0,0,0,5,3,0,1,5,9]}},
+  {nombre:"Filipina GUS, BROCHE, M/C, Cuello Cruzado, Negra",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"05/03/2026",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[8,14,12,29,10,4,27,52,12,13,20,12,15,15,15,18]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[11,14,14,19,27,31,37,26,23,32,26,17,18,13,12,4]}},
+  {nombre:"Filipina GUS GALA, BOTÓN BICOLOR, M/L, Cuello Cruzado, Negra",codigo:"",estante:"Estante 6",fecha:"01/01/2026",ultMod:"05/02/2026",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[7,4,null,6,3,0,0,5,11,11,16,2,5,4,0,0]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[0,7,1,5,7,11,2,16,7,11,15,8,5,5,0,0]}},
+  {nombre:"Filipina GUS GALA, BOTÓN BICOLOR, M/L, Cuello Cruzado, Blanca",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"31/07/2025",cab:{tallas:[26,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58],exist:[5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[null,null,1,null,null,2,null,null,0,11,10,3,4,4,null,null]}},
+  {nombre:"Filipina Tela Delgada, M/L, Blanca Cuello Cuadrado (VATEL)",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"??/??/????",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58],exist:[0,0,0,9,2,1,0,0,0,0,6,0,2,5,4,1,0]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52],exist:[0,0,0,5,8,7,5,0,0,2,0,1,1,1,0,1,2]}},
+  {nombre:"Filipina Mixología, Cuello Cuadrado, Botón Oculto Central",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"05/01/2026",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48],exist:[null,null,null,4,10,2,4,7,2,null,null,null]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42],exist:[null,null,null,null,null,null,null,null,null,null,2,null]}},
+  {nombre:"Filipina BAJA CALIFORNIA, BROCHE, M/C, Cuello Cuadrado, Gris",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"31/07/2025",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48],exist:[null,null,null,1,null,2,null,7,9,8,null,null]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42],exist:[null,null,null,null,null,null,null,null,null,null,null,null]}},
+  {nombre:"Filipina BAJA CALIFORNIA GUAFLE, BROCHE, M/L, Cuello Cuadrado, Blanca",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"31/07/2025",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[0,0,0,7,15,7,6,10,0,0,0,0,0,0,0,0]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[0,0,7,11,18,17,22,16,17,0,3,0,0,0,0,0]}},
+  {nombre:"Filipina YUCATAN, BROCHE, M/L, Cuello Cuadrado, Blanca, Sin Respiración",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"04/02/2026",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[0,20,18,16,0,0,0,0,0,0,11,1,0,0,0,1]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,56],exist:[0,0,18,20,23,23,43,0,0,0,0,0,0,0,0,0,0]}},
+  {nombre:"Filipina Tela Delgada, M/L, Blanca GUS",codigo:"",estante:"Estante 6",fecha:"??/??/???",ultMod:"24/01/2026",cab:{tallas:[26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58],exist:[null,null,2,12,9,0,0,0,0,2,4,5,6,6,6,1,8]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52],exist:[0,5,5,7,19,20,22,9,0,7,0,1,1,1,0,1,2]}},
+  {nombre:"Filipina Baja California, Blanca, Bies Azul, Transpiración, M/C",codigo:"",estante:"Estante 6",fecha:"???",ultMod:"09/02/2026",cab:{tallas:[24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56],exist:[0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0]},dam:{tallas:[20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50],exist:[0,0,0,0,0,0,3,3,5,5,2,0,0,0,0,0]}},
+];
+const PANTS=[
+  {nombre:"Pants Pata de Gallo",genero:"Unisex",fecha:"",tallas:["XXS","XS","S","M","L","XL","2XL","3XL","4XL"],exist:[37,25,50,135,128,150,38,52,14]},
+  {nombre:"Pants Negro",genero:"Unisex",fecha:"",tallas:["XXS","XS","S","M","L","XL","2XL","3XL","4XL"],exist:[null,22,47,null,null,58,null,5,1]},
+  {nombre:"Pants Mini Pata",genero:"Unisex",fecha:"14/03/2026",tallas:["XXS","XS","S","M","L","XL","2XL","3XL","4XL"],exist:[1,3,26,3,46,null,5,35,6]},
+  {nombre:"Pants Gris",genero:"Unisex",fecha:"",tallas:["XXS","XS","S","M","L","XL","2XL","3XL"],exist:[null,1,2,null,null,null,7,null]},
+  {nombre:"Bermuda Beige — Caballero",genero:"Caballero",fecha:"",tallas:["T24","T26","T28","T30","T32","T34","T36","T38","T42"],exist:[null,null,null,null,null,2,1,1,null]},
+  {nombre:"Bermuda Beige — Dama",genero:"Dama",fecha:"",tallas:["T20","T24","T26","T28","T30","T32","T34","T42","T8","T10","T16"],exist:[1,3,3,2,5,null,3,2,1,1,1]},
+  {nombre:"Pantalón Beige — Caballero",genero:"Caballero",fecha:"",tallas:["T28","T29","T30","T31","T32","T33","T34","T36","T37","T38","T42","T44","T46","T48"],exist:[6,14,7,22,4,1,6,13,5,4,8,7,3,1]},
+  {nombre:"Pantalón Beige — Dama",genero:"Dama",fecha:"",tallas:["T12","T14","T16","T18","T20","T22"],exist:[9,6,3,3,1,3]},
+  {nombre:"Pantalón Marino Claro — Caballero",genero:"Caballero",fecha:"",tallas:["T28","T30","T34","T36","T41","T42","T46","T12","T18"],exist:[3,3,5,3,2,1,1,1,2]},
+  {nombre:"Pantalón Vestir Marino Obs.",genero:"Cab/Dama",fecha:"",tallas:["T32C","T34C","T35C","T36C","T38C","T42C","T44C","T10D","T36D","T40D"],exist:[5,15,2,12,2,2,3,1,1,1]},
+  {nombre:"Pantalón Negro Dama / Bolsa Transparente",genero:"Dama",fecha:"",tallas:["T10","T11","T12","T14","T22","T32","T34","T36","T38","T40"],exist:[2,6,1,2,2,6,3,3,4,2]},
+];
+const CAMISAS=[
+  {nombre:"Blusa Blanca M/L Botón Oculto — Dama",genero:"Dama",ultMod:"05/01/2026",tallas:["T22","T24","T26","T28","T30","T32","T34","T36","T38","T40","T42","T44","T46"],exist:[8,4,6,18,5,0,6,18,12,15,18,12,15]},
+  {nombre:"Blusa Rayada de Servicio — Dama",genero:"Dama",ultMod:"05/01/2026",tallas:["T24","T26","T28","T30","T32","T34","T36","T38","T40","T42","T44","T46"],exist:[0,1,16,14,0,0,8,0,3,8,9,1]},
+  {nombre:"Camisa Blanca M/L Botón Oculto — Caballero",genero:"Caballero",ultMod:"05/01/2026",tallas:["XS","S","M","L","XL","XXL","XXXL"],exist:[40,12,24,32,28,18,24]},
+  {nombre:"Camisa Rayada de Servicio — Caballero",genero:"Caballero",ultMod:"05/01/2026",tallas:["XXS","XS","S","M","L","XL","XXL","XXXL"],exist:[0,10,35,70,70,30,10,5]},
+  {nombre:"Camisa Blanca M/L Botón Visible — Caballero",genero:"Caballero",ultMod:"05/01/2026",tallas:["XS","S","M","L","XL","XXL","XXXL"],exist:[3,null,null,null,2,null,null]},
+];
+const MANDILES=[
+  {nombre:"Mandil Oxford",exist:2,fecha:""},
+  {nombre:"Mandil Café",exist:0,fecha:""},
+  {nombre:"Mandil Rayas Café",exist:23,fecha:""},
+  {nombre:"Mandil Beige",exist:11,fecha:""},
+  {nombre:"Mandil Marino",exist:8,fecha:""},
+  {nombre:"Mandil Doble Negro",exist:55,fecha:"18/12/2025"},
+  {nombre:"Mandil Peto Envolvente Oxford",exist:105,fecha:""},
+  {nombre:"Mandil Peto Envolvente Negro",exist:5,fecha:""},
+  {nombre:"Mandil Peto Negro",exist:104,fecha:"09/01/2026"},
+  {nombre:"Mandil Arena Cinta Verde / Tono 1",exist:9,fecha:""},
+  {nombre:"Mandil Arena Cinta Verde / Tono 2",exist:23,fecha:""},
+  {nombre:"Mandil Doble Blanco Versal",exist:180,fecha:""},
+  {nombre:"Mandil Doble Blanco Aspic",exist:170,fecha:"15/01/2026"},
+  {nombre:"Mandil Sin Bolsas (Panchito)",exist:44,fecha:"23/12/2025"},
+  {nombre:"Mandil Escote V Versal Negro",exist:300,fecha:"04/03/2026"},
+  {nombre:"Mandil Doble Sencillo con Pico",exist:12,fecha:""},
+  {nombre:"Mandil Envolvente Blanco",exist:16,fecha:""},
+  {nombre:"Mandil Sommelier Negro",exist:3,fecha:""},
+  {nombre:"Mandil Gris Doble Bolsa Cross Back",exist:78,fecha:""},
+  {nombre:"Mandil Gris Oxford Cinta Cross Back",exist:85,fecha:""},
+  {nombre:"Mandil Gris Oxford 3 Bolsas + Hojillo",exist:40,fecha:""},
+];
+const ACCESORIOS=[
+  {nombre:"Toque Aspic Blanco",exist:69,fecha:""},
+  {nombre:"Toque Negro",exist:39,fecha:""},
+  {nombre:"Toque Blanco",exist:9,fecha:""},
+  {nombre:"Cuartilla Gris",exist:66,fecha:""},
+  {nombre:"Cuartilla Blanca",exist:18,fecha:"20/01/2026"},
+  {nombre:"Cuartilla Negra",exist:302,fecha:"20/01/2026"},
+  {nombre:"Trapo Negro",exist:130,fecha:"(pendiente revisar)"},
+  {nombre:"Trapo de Versatil",exist:400,fecha:"15/01/2026"},
+  {nombre:"Trapo Aspic",exist:370,fecha:"15/01/2026"},
+  {nombre:"Picos Negros",exist:97,fecha:"18/12/2025"},
+  {nombre:"Picos Blancos",exist:180,fecha:""},
+  {nombre:"Morelos (Bandana) Gorro Blanco",exist:102,fecha:"15/01/2026"},
+  {nombre:"Morelos (Bandana) Negro",exist:0,fecha:"15/01/2026"},
+  {nombre:"Gorro de Hongo Adolescente",exist:2,fecha:"18/12/2025"},
+  {nombre:"Gorro de Niño",exist:2,fecha:"18/12/2025"},
+];
+const INSUMOS=[
+  {id:"BP-00024",nombre:"Botón del 24 Blanco",tipo:"BOTÓN",stock:3000,notas:"Ingreso 16/02/2026"},
+  {id:"BP-10073a",nombre:"Botón del 36 Negro/Blanco",tipo:"BOTÓN",stock:1000,notas:"Ingreso 16/02/2026"},
+  {id:"BP-10073b",nombre:"Botón del 36 Blanco/Negro",tipo:"BOTÓN",stock:4500,notas:"Ingreso 16/02/2026"},
+];
+
+// ── STATE ────────────────────────────────────────────
+let productosPlanos=[], borradores=[], API_URL="";
+let editIdx=null, editImgB64=null, editTab="url";
+
+// ── HELPERS ──────────────────────────────────────────
+const M={FIL:5,PAN:10,CAM:5,MAN:5,ACC:10};
+function sum(a){return a.filter(x=>typeof x==="number").reduce((s,v)=>s+v,0)}
+function zeros(a){return a.filter(x=>x===0).length}
+function low(a,m){return a.filter(x=>typeof x==="number"&&x>0&&x<m).length}
+function exCls(v,m=5){if(v===null||v===undefined)return"ex-none";if(v===0)return"ex-zero";if(v<m)return"ex-low";return"ex-ok"}
+function badge(v,m=5){
+  if(v===null||v===undefined)return'<span class="badge b-none">Sin dato</span>';
+  if(v===0)return'<span class="badge b-danger">🔴 Agotado</span>';
+  if(v<m)return'<span class="badge b-warn">⚠️ Bajo</span>';
+  return'<span class="badge b-ok">✅ OK</span>';
+}
+function statsEl(m,t,z,l){return`<div class="stat"><div class="stat-lbl">Modelos</div><div class="stat-val sv-gold">${m}</div></div><div class="stat"><div class="stat-lbl">Total Piezas</div><div class="stat-val">${t.toLocaleString()}</div></div><div class="stat"><div class="stat-lbl">Sin Stock</div><div class="stat-val sv-red">${z}</div></div><div class="stat"><div class="stat-lbl">Bajo Mínimo</div><div class="stat-val sv-yellow">${l}</div></div>`}
+function thumb(img){return img?`<img class="prod-thumb" src="${img}" onerror="this.style.display='none'">`:`<span class="prod-thumb-placeholder">📦</span>`}
+function actBtns(pIdx){return`<div class="row-actions"><button class="ib-edit" onclick="openModal(${pIdx})" title="Editar">✎</button><button class="ib-del" onclick="delProd(${pIdx})" title="Eliminar">🗑</button></div>`}
+
+// ── TALLAS TABLE with edit buttons ───────────────────
+function tallasTable(tallas,exist,min,planos){
+  const rows=tallas.map((t,i)=>{
+    const ex=exist[i]; const d=ex===null||ex===undefined?"—":ex;
+    const pIdx=planos?planos.findIndex(p=>p.talla===("Cab "+t)||p.talla===("Dam "+t)||p.talla===String(t)):-1;
+    const acts=pIdx>=0?actBtns(pIdx):"";
+    return`<tr><td>${t}</td><td><div class="stock-cell"><span class="ex-val ${exCls(ex,min)}">${d}</span>${acts}</div></td></tr>`;
+  }).join("")+`<tr class="tr-total"><td>TOTAL</td><td class="ex-val">${sum(exist)}</td></tr>`;
+  return`<table class="tallas-table"><thead><tr><th>Talla</th><th>Exist.</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function chip(t,gold=false){return`<span class="meta-chip${gold?" meta-gold":""}">${t}</span>`}
+
+// ── RENDERS ──────────────────────────────────────────
+function renderFilipinas(q=""){
+  let html="",tp=0,tz=0,tl=0;
+  FILIPINAS.filter(f=>!q||f.nombre.toLowerCase().includes(q.toLowerCase())).forEach((f,i)=>{
+    const ct=sum(f.cab.exist),dt=sum(f.dam.exist),tot=ct+dt;
+    tp+=tot; tz+=zeros(f.cab.exist)+zeros(f.dam.exist); tl+=low(f.cab.exist,M.FIL)+low(f.dam.exist,M.FIL);
+    const cabP=productosPlanos.filter(p=>p._fil===f&&p._side==="cab");
+    const damP=productosPlanos.filter(p=>p._fil===f&&p._side==="dam");
+    const meta=`${f.codigo?chip(f.codigo):""}${chip(f.estante)}${chip("Mod:"+f.ultMod)}${chip("Total:"+tot+" pzas",true)}`;
+    html+=`<div class="modelo-card"><div class="modelo-header"><div class="modelo-nombre">[${String(i+1).padStart(2,"0")}] ${f.nombre}</div><div class="modelo-meta">${meta}</div></div>
+    <div class="modelo-body"><div class="tallas-grid">
+      <div class="genero-block"><div class="genero-title">Caballero · ${ct} pzas</div>${tallasTable(f.cab.tallas,f.cab.exist,M.FIL,cabP)}</div>
+      <div class="genero-block"><div class="genero-title">Dama · ${dt} pzas</div>${tallasTable(f.dam.tallas,f.dam.exist,M.FIL,damP)}</div>
+    </div></div></div>`;
+  });
+  document.getElementById("filipinas-container").innerHTML=html||'<div class="no-results">Sin resultados.</div>';
+  document.getElementById("stats-fil").innerHTML=statsEl(FILIPINAS.length,tp,tz,tl);
+}
+
+function renderPants(q=""){
+  let html="",tp=0,tz=0,tl=0;
+  PANTS.filter(p=>!q||p.nombre.toLowerCase().includes(q.toLowerCase())).forEach(p=>{
+    const tot=sum(p.exist); tp+=tot; tz+=zeros(p.exist); tl+=low(p.exist,M.PAN);
+    const planos=productosPlanos.filter(x=>x._pants===p);
+    const meta=`${chip(p.genero)}${p.fecha?chip(p.fecha):""}${chip("Total:"+tot+" pzas",true)}`;
+    html+=`<div class="modelo-card"><div class="modelo-header"><div class="modelo-nombre">${p.nombre}</div><div class="modelo-meta">${meta}</div></div>
+    <div class="modelo-body"><div class="genero-block" style="max-width:280px">${tallasTable(p.tallas,p.exist,M.PAN,planos)}</div></div></div>`;
+  });
+  document.getElementById("pants-container").innerHTML=html;
+  document.getElementById("stats-pan").innerHTML=statsEl(PANTS.length,tp,tz,tl);
+}
+
+function renderCamisas(){
+  let html="",tp=0,tz=0,tl=0;
+  CAMISAS.forEach(c=>{
+    const tot=sum(c.exist); tp+=tot; tz+=zeros(c.exist); tl+=low(c.exist,M.CAM);
+    const planos=productosPlanos.filter(x=>x._cam===c);
+    const meta=`${chip(c.genero)}${chip("Act."+c.ultMod)}${chip("Total:"+tot+" pzas",true)}`;
+    html+=`<div class="modelo-card"><div class="modelo-header"><div class="modelo-nombre">${c.nombre}</div><div class="modelo-meta">${meta}</div></div>
+    <div class="modelo-body"><div class="genero-block" style="max-width:280px">${tallasTable(c.tallas,c.exist,M.CAM,planos)}</div></div></div>`;
+  });
+  document.getElementById("camisas-container").innerHTML=html;
+  document.getElementById("stats-cam").innerHTML=statsEl(CAMISAS.length,tp,tz,tl);
+}
+
+function renderMandiles(){
+  let t=0,z=0,l=0;
+  document.getElementById("mandiles-tbody").innerHTML=MANDILES.map(m=>{
+    t+=m.exist||0; if(m.exist===0)z++; if(m.exist>0&&m.exist<M.MAN)l++;
+    const pIdx=productosPlanos.findIndex(p=>p._man===m);
+    return`<tr>
+      <td>${thumb(m.imagen)}</td>
+      <td>${m.nombre}</td>
+      <td><strong class="${exCls(m.exist,M.MAN)} ex-val">${m.exist}</strong></td>
+      <td style="font-size:11px;color:var(--muted)">${m.fecha||"—"}</td>
+      <td>${badge(m.exist,M.MAN)}</td>
+      <td>${pIdx>=0?actBtns(pIdx):""}</td>
+    </tr>`;}).join("");
+  document.getElementById("stats-man").innerHTML=statsEl(MANDILES.length,t,z,l);
+}
+
+function renderAccesorios(){
+  let t=0,z=0,l=0;
+  document.getElementById("accesorios-tbody").innerHTML=ACCESORIOS.map(a=>{
+    t+=a.exist||0; if(a.exist===0)z++; if(a.exist>0&&a.exist<M.ACC)l++;
+    const pIdx=productosPlanos.findIndex(p=>p._acc===a);
+    return`<tr>
+      <td>${thumb(a.imagen)}</td>
+      <td>${a.nombre}</td>
+      <td><strong class="${exCls(a.exist,M.ACC)} ex-val">${a.exist}</strong></td>
+      <td style="font-size:11px;color:var(--muted)">${a.fecha||"—"}</td>
+      <td>${badge(a.exist,M.ACC)}</td>
+      <td>${pIdx>=0?actBtns(pIdx):""}</td>
+    </tr>`;}).join("");
+  document.getElementById("stats-acc").innerHTML=statsEl(ACCESORIOS.length,t,z,l);
+}
+
+function renderInsumos(){
+  document.getElementById("insumos-tbody").innerHTML=INSUMOS.map((ins,ii)=>{
+    const pIdx=productosPlanos.findIndex(p=>p._ins===ins);
+    return`<tr>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${ins.id}</td>
+      <td>${ins.nombre}</td>
+      <td><strong style="font-family:'DM Mono',monospace">${ins.stock.toLocaleString()}</strong></td>
+      <td>${badge(ins.stock,200)}</td>
+      <td style="font-size:11px;color:var(--muted)">${ins.notas}</td>
+      <td>${pIdx>=0?actBtns(pIdx):""}</td>
+    </tr>`;}).join("");
+}
+
+function renderAlertas(){
+  const alts=[];
+  MANDILES.forEach(m=>{if(m.exist<=M.MAN)alts.push({cat:"Mandil",nombre:m.nombre,talla:"Único",exist:m.exist,min:M.MAN})});
+  ACCESORIOS.forEach(a=>{if(a.exist<=M.ACC)alts.push({cat:"Accesorio",nombre:a.nombre,talla:"Único",exist:a.exist,min:M.ACC})});
+  CAMISAS.forEach(c=>{c.tallas.forEach((t,i)=>{const ex=c.exist[i];if(typeof ex==="number"&&ex<M.CAM)alts.push({cat:"Camisa",nombre:c.nombre,talla:t,exist:ex,min:M.CAM})})});
+  PANTS.forEach(p=>{p.tallas.forEach((t,i)=>{const ex=p.exist[i];if(typeof ex==="number"&&ex<M.PAN)alts.push({cat:"Pants",nombre:p.nombre,talla:t,exist:ex,min:M.PAN})})});
+  FILIPINAS.forEach(f=>{
+    f.cab.tallas.forEach((t,i)=>{const ex=f.cab.exist[i];if(typeof ex==="number"&&ex<M.FIL)alts.push({cat:"Filipina",nombre:f.nombre,talla:"Cab "+t,exist:ex,min:M.FIL})});
+    f.dam.tallas.forEach((t,i)=>{const ex=f.dam.exist[i];if(typeof ex==="number"&&ex<M.FIL)alts.push({cat:"Filipina",nombre:f.nombre,talla:"Dam "+t,exist:ex,min:M.FIL})});
+  });
+  alts.sort((a,b)=>a.exist-b.exist);
+  document.getElementById("nc-alr").textContent=alts.length;
+  const ag=alts.filter(a=>a.exist===0),bj=alts.filter(a=>a.exist>0);
+  const row=a=>`<tr><td><span class="badge b-cat">${a.cat}</span></td><td>${a.nombre}</td><td>${a.talla}</td><td><strong class="${a.exist===0?"sv-red":"sv-yellow"}" style="font-family:'DM Mono',monospace">${a.exist}</strong></td><td>${a.min}</td></tr>`;
+  let html=`<div class="stats"><div class="stat"><div class="stat-lbl">Total Alertas</div><div class="stat-val sv-red">${alts.length}</div></div><div class="stat"><div class="stat-lbl">Agotados</div><div class="stat-val sv-red">${ag.length}</div></div><div class="stat"><div class="stat-lbl">Bajo Mínimo</div><div class="stat-val sv-yellow">${bj.length}</div></div></div>`;
+  if(ag.length)html+=`<div class="section-lbl" style="color:var(--red);margin-top:.8rem">🔴 Agotados (${ag.length})</div><div class="table-wrap"><table><thead><tr><th>Cat.</th><th>Producto</th><th>Talla</th><th>Exist.</th><th>Mín.</th></tr></thead><tbody>${ag.map(row).join("")}</tbody></table></div>`;
+  if(bj.length)html+=`<div class="section-lbl" style="color:var(--yellow);margin-top:.8rem">⚠️ Bajo Mínimo (${bj.length})</div><div class="table-wrap"><table><thead><tr><th>Cat.</th><th>Producto</th><th>Talla</th><th>Exist.</th><th>Mín.</th></tr></thead><tbody>${bj.map(row).join("")}</tbody></table></div>`;
+  document.getElementById("alertas-container").innerHTML=html;
+}
+
+function renderResumen(){
+  const cats=[
+    {n:"👔 Filipinas",m:FILIPINAS.length,t:FILIPINAS.reduce((a,f)=>a+sum(f.cab.exist)+sum(f.dam.exist),0),z:FILIPINAS.reduce((a,f)=>a+zeros(f.cab.exist)+zeros(f.dam.exist),0),l:FILIPINAS.reduce((a,f)=>a+low(f.cab.exist,M.FIL)+low(f.dam.exist,M.FIL),0)},
+    {n:"👖 Pants",m:PANTS.length,t:PANTS.reduce((a,p)=>a+sum(p.exist),0),z:PANTS.reduce((a,p)=>a+zeros(p.exist),0),l:PANTS.reduce((a,p)=>a+low(p.exist,M.PAN),0)},
+    {n:"👕 Camisas",m:CAMISAS.length,t:CAMISAS.reduce((a,c)=>a+sum(c.exist),0),z:CAMISAS.reduce((a,c)=>a+zeros(c.exist),0),l:CAMISAS.reduce((a,c)=>a+low(c.exist,M.CAM),0)},
+    {n:"🧥 Mandiles",m:MANDILES.length,t:MANDILES.reduce((a,m)=>a+(m.exist||0),0),z:MANDILES.filter(m=>m.exist===0).length,l:MANDILES.filter(m=>m.exist>0&&m.exist<M.MAN).length},
+    {n:"🎩 Accesorios",m:ACCESORIOS.length,t:ACCESORIOS.reduce((a,x)=>a+(x.exist||0),0),z:ACCESORIOS.filter(a=>a.exist===0).length,l:ACCESORIOS.filter(a=>a.exist>0&&a.exist<M.ACC).length},
+    {n:"🔩 Insumos",m:INSUMOS.length,t:INSUMOS.reduce((a,i)=>a+i.stock,0),z:0,l:0},
+  ];
+  const gt=cats.reduce((a,c)=>a+c.t,0),gz=cats.reduce((a,c)=>a+c.z,0),gl=cats.reduce((a,c)=>a+c.l,0);
+  document.getElementById("stats-resumen").innerHTML=`<div class="stat"><div class="stat-lbl">Categorías</div><div class="stat-val sv-gold">6</div></div><div class="stat"><div class="stat-lbl">Total Piezas</div><div class="stat-val">${gt.toLocaleString()}</div></div><div class="stat"><div class="stat-lbl">Sin Stock</div><div class="stat-val sv-red">${gz}</div></div><div class="stat"><div class="stat-lbl">Bajo Mínimo</div><div class="stat-val sv-yellow">${gl}</div></div>`;
+  document.getElementById("resumen-tbody").innerHTML=cats.map(c=>`<tr><td>${c.n}</td><td>${c.m}</td><td><strong style="font-family:'DM Mono',monospace">${c.t.toLocaleString()}</strong></td><td>${c.z>0?`<span class="sv-red" style="font-weight:600">${c.z}</span>`:"—"}</td><td>${c.l>0?`<span class="sv-yellow" style="font-weight:600">${c.l}</span>`:"—"}</td></tr>`).join("");
+}
+
+function renderBorradores(){
+  const c=document.getElementById("borradores-container"),nb=document.getElementById("nc-bor");
+  if(!borradores.length){c.innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted);font-size:13px">No hay borradores pendientes.</div>';nb.style.display="none";return;}
+  nb.textContent=borradores.length;nb.style.display="inline";
+  c.innerHTML=`<div style="background:rgba(212,168,75,.08);border:1px solid rgba(212,168,75,.2);border-radius:var(--radius);padding:9px 13px;margin-bottom:.9rem;font-size:13px;color:var(--accent)">⏳ ${borradores.length} borrador(es) pendiente(s).</div>`
+  +borradores.map((d,i)=>`<div class="draft-item">
+    <div style="flex:1">
+      <div class="draft-title">${d.tipo.toUpperCase()} — ${d.prodNombre}</div>
+      <div class="draft-meta">${d.fecha||""} · ${d.talla} · ${d.resp||"Sin nombre"}</div>
+      <div style="font-size:12px;margin-top:4px">Cant: <strong>${d.qty}</strong> · Stock: <span style="color:var(--muted)">${d.actual}</span> → <strong style="color:${d.resultado>=0?"var(--green)":"var(--red)"}">${d.resultado}</strong>${d.nota?`<br><em style="color:var(--muted)">${d.nota}</em>`:""}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="btn btn-success btn-sm" onclick="confirmDraft(${i})">✓ Confirmar</button>
+      <button class="btn btn-danger btn-sm" onclick="discardDraft(${i})">✕</button>
+    </div>
+  </div>`).join("");
+}
+
+// ── PRODUCTS PLANOS ───────────────────────────────────
+function buildProductosPlanos(){
+  productosPlanos=[];
+  FILIPINAS.forEach(f=>{
+    f.cab.tallas.forEach((t,i)=>productosPlanos.push({id:`FIL-C${t}-${FILIPINAS.indexOf(f)}`,nombre:f.nombre,talla:"Cab "+t,cat:"Filipina",genero:"Caballero",exist:f.cab.exist[i]??0,min:M.FIL,imagen:f.imagen||"",notas:f.estante,_fil:f,_side:"cab",_idx:i}));
+    f.dam.tallas.forEach((t,i)=>productosPlanos.push({id:`FIL-D${t}-${FILIPINAS.indexOf(f)}`,nombre:f.nombre,talla:"Dam "+t,cat:"Filipina",genero:"Dama",exist:f.dam.exist[i]??0,min:M.FIL,imagen:f.imagen||"",notas:f.estante,_fil:f,_side:"dam",_idx:i}));
+  });
+  PANTS.forEach(p=>p.tallas.forEach((t,i)=>productosPlanos.push({id:`PAN-${t}-${PANTS.indexOf(p)}`,nombre:p.nombre,talla:t,cat:"Pants",genero:p.genero,exist:p.exist[i]??0,min:M.PAN,imagen:p.imagen||"",notas:"",_pants:p,_idx:i})));
+  CAMISAS.forEach(c=>c.tallas.forEach((t,i)=>productosPlanos.push({id:`CAM-${t}-${CAMISAS.indexOf(c)}`,nombre:c.nombre,talla:t,cat:"Camisa",genero:c.genero,exist:c.exist[i]??0,min:M.CAM,imagen:c.imagen||"",notas:"",_cam:c,_idx:i})));
+  MANDILES.forEach(m=>productosPlanos.push({id:`MAN-${MANDILES.indexOf(m)}`,nombre:m.nombre,talla:"Único",cat:"Mandil",genero:"Unisex",exist:m.exist,min:M.MAN,imagen:m.imagen||"",notas:m.fecha||"",_man:m}));
+  ACCESORIOS.forEach(a=>productosPlanos.push({id:`ACC-${ACCESORIOS.indexOf(a)}`,nombre:a.nombre,talla:"Único",cat:"Accesorio",genero:"Unisex",exist:a.exist,min:M.ACC,imagen:a.imagen||"",notas:a.fecha||"",_acc:a}));
+  INSUMOS.forEach(ins=>productosPlanos.push({id:ins.id,nombre:ins.nombre,talla:ins.id,cat:"Insumo",genero:"N/A",exist:ins.stock,min:200,imagen:"",notas:ins.notas,_ins:ins}));
+  // Populate mov-prod select
+  const sel=document.getElementById("mov-prod");
+  sel.innerHTML='<option value="">— Seleccionar —</option>';
+  let lastCat="";
+  productosPlanos.forEach((p,i)=>{
+    if(p.cat!==lastCat){if(lastCat)sel.insertAdjacentHTML("beforeend","</optgroup>");sel.insertAdjacentHTML("beforeend",`<optgroup label="${p.cat}">`);lastCat=p.cat;}
+    sel.insertAdjacentHTML("beforeend",`<option value="${i}">${p.nombre} — ${p.talla}</option>`);
+  });
+  if(lastCat)sel.insertAdjacentHTML("beforeend","</optgroup>");
+}
+
+// ── EDIT MODAL ────────────────────────────────────────
+function openModal(pIdx){
+  const p=productosPlanos[pIdx]; if(!p)return;
+  editIdx=pIdx; editImgB64=null;
+  document.getElementById("modal-title").textContent=p.nombre+" — "+p.talla;
+  document.getElementById("e-cod").value=p.id||"";
+  document.getElementById("e-cat").value=p.cat||"Filipina";
+  document.getElementById("e-nom").value=p.nombre||"";
+  document.getElementById("e-tal").value=p.talla||"";
+  document.getElementById("e-gen").value=p.genero||"Unisex";
+  document.getElementById("e-ex").value=p.exist??0;
+  document.getElementById("e-min").value=p.min??5;
+  document.getElementById("e-nota").value=p.notas||"";
+  document.getElementById("e-img").value=p.imagen||"";
+  updatePreview();
+  switchTab("url");
+  document.getElementById("modal-overlay").classList.add("open");
+}
+function closeModal(){document.getElementById("modal-overlay").classList.remove("open");editIdx=null;editImgB64=null;}
+function switchTab(t){
+  editTab=t;
+  document.getElementById("tab-url").classList.toggle("active",t==="url");
+  document.getElementById("tab-up").classList.toggle("active",t==="up");
+  document.getElementById("url-section").style.display=t==="url"?"block":"none";
+}
+function updatePreview(){
+  const url=document.getElementById("e-img").value.trim();
+  const prev=document.getElementById("img-preview");
+  if(editImgB64){prev.innerHTML=`<img src="${editImgB64}">`;return;}
+  if(url){
+    let u=url;
+    const dm=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if(dm)u=`https://drive.google.com/thumbnail?id=${dm[1]}&sz=w400`;
+    prev.innerHTML=`<img src="${u}" onerror="this.parentElement.innerHTML='<div class=img-placeholder><span>❌</span><p>No se pudo cargar</p></div>'">`;
+  } else {
+    prev.innerHTML='<div class="img-placeholder"><span>🖼</span><p>Haz clic para subir o usa una URL</p></div>';
+  }
+}
+function handleUpload(input){
+  const file=input.files[0]; if(!file)return;
+  if(file.size>3*1024*1024){toast("Imagen demasiado grande. Máx 3MB.","warn");return;}
+  const r=new FileReader();
+  r.onload=e=>{editImgB64=e.target.result;document.getElementById("e-img").value="";updatePreview();toast("Imagen lista. Guarda los cambios.","ok");};
+  r.readAsDataURL(file);
+}
+async function saveModal(){
+  const p=productosPlanos[editIdx]; if(!p)return;
+  const oldExist=p.exist;
+  const newExist=parseInt(document.getElementById("e-ex").value)??p.exist;
+  p.exist=newExist;
+  p.min=parseInt(document.getElementById("e-min").value)??p.min;
+  p.nombre=document.getElementById("e-nom").value.trim()||p.nombre;
+  p.talla=document.getElementById("e-tal").value.trim()||p.talla;
+  p.notas=document.getElementById("e-nota").value.trim();
+  p.cat=document.getElementById("e-cat").value;
+  p.genero=document.getElementById("e-gen").value;
+  // Image
+  if(editImgB64){p.imagen=editImgB64;}
+  else{
+    const u=document.getElementById("e-img").value.trim();
+    if(u){const dm=u.match(/\/d\/([a-zA-Z0-9_-]+)/);p.imagen=dm?`https://drive.google.com/thumbnail?id=${dm[1]}&sz=w400`:u;}
+  }
+  // Update source arrays
+  if(p._fil)p._fil[p._side].exist[p._idx]=newExist;
+  else if(p._pants)p._pants.exist[p._idx]=newExist;
+  else if(p._cam)p._cam.exist[p._idx]=newExist;
+  else if(p._man)p._man.exist=newExist;
+  else if(p._acc)p._acc.exist=newExist;
+  else if(p._ins)p._ins.stock=newExist;
+  // Sheets
+  if(API_URL){
+    showLoading("Guardando en Google Sheets...");
+    try{
+      await apiPost({action:"updateProductById",id:p.id,existencias:newExist,minimo:p.min,nombre:p.nombre,talla:p.talla,cat:p.cat,genero:p.genero,imagen:p.imagen,notas:p.notas,updatedAt:new Date().toISOString()});
+      if(newExist!==oldExist){
+        await apiPost({action:"addMovimiento",mov:{id:"M"+Date.now(),productId:p.id,productName:p.nombre,talla:p.talla,tipo:"ajuste-directo",qty:Math.abs(newExist-oldExist),fecha:new Date().toISOString().slice(0,10),nota:"Edición directa",responsable:"Editor",stockActual:oldExist,stockResult:newExist,confirmedAt:new Date().toLocaleString("es-MX")}});
+      }
+    }catch(e){toast("Cambios aplicados localmente.","warn");}
+    hideLoading();
+  }
+  toast("✓ Cambios guardados","ok");
+  closeModal();
+  renderFilipinas();renderPants();renderCamisas();renderMandiles();renderAccesorios();renderInsumos();renderAlertas();
+}
+async function deleteFromModal(){
+  const p=productosPlanos[editIdx]; if(!p)return;
+  if(!confirm(`¿Eliminar "${p.nombre} — ${p.talla}"?`))return;
+  await delProd(editIdx);
+  closeModal();
+}
+async function delProd(pIdx){
+  const p=productosPlanos[pIdx]; if(!p)return;
+  if(p._fil){p._fil[p._side].exist.splice(p._idx,1);p._fil[p._side].tallas.splice(p._idx,1);}
+  else if(p._pants){p._pants.exist.splice(p._idx,1);p._pants.tallas.splice(p._idx,1);}
+  else if(p._cam){p._cam.exist.splice(p._idx,1);p._cam.tallas.splice(p._idx,1);}
+  else if(p._man){MANDILES.splice(MANDILES.indexOf(p._man),1);}
+  else if(p._acc){ACCESORIOS.splice(ACCESORIOS.indexOf(p._acc),1);}
+  else if(p._ins){INSUMOS.splice(INSUMOS.indexOf(p._ins),1);}
+  productosPlanos.splice(pIdx,1);
+  buildProductosPlanos();
+  if(API_URL){try{await apiPost({action:"deleteProduct",id:p.id});}catch(e){}}
+  toast(`🗑 "${p.nombre}" eliminado`,"warn");
+  renderFilipinas();renderPants();renderCamisas();renderMandiles();renderAccesorios();renderInsumos();renderAlertas();
+}
+
+// ── MOVIMIENTOS FORM ─────────────────────────────────
+function autoFill(){
+  const p=productosPlanos[parseInt(document.getElementById("mov-prod").value)];
+  if(!p){["mov-cat","mov-talla-in","mov-actual","mov-result"].forEach(id=>document.getElementById(id).value="");return;}
+  document.getElementById("mov-cat").value=p.cat;
+  document.getElementById("mov-talla-in").value=p.talla;
+  document.getElementById("mov-actual").value=p.exist;
+  calcResultado();
+}
+function calcResultado(){
+  const p=productosPlanos[parseInt(document.getElementById("mov-prod").value)]; if(!p)return;
+  const tipo=document.getElementById("mov-tipo").value;
+  const qty=parseInt(document.getElementById("mov-qty").value)||0;
+  let res=Number(p.exist);
+  if(tipo==="entrada"||tipo==="devolucion")res+=qty;
+  else if(tipo==="salida")res-=qty;
+  else if(tipo==="ajuste")res=qty;
+  const el=document.getElementById("mov-result");
+  el.value=res;
+  el.style.color=res<0?"var(--red)":res<p.min?"var(--yellow)":"var(--green)";
+}
+async function saveDraft(){
+  const p=productosPlanos[parseInt(document.getElementById("mov-prod").value)];
+  if(!p){toast("Selecciona un producto.","warn");return;}
+  const qty=parseInt(document.getElementById("mov-qty").value);
+  if(!qty||qty<=0){toast("Ingresa una cantidad válida.","warn");return;}
+  const tipo=document.getElementById("mov-tipo").value;
+  let res=Number(p.exist);
+  if(tipo==="entrada"||tipo==="devolucion")res+=qty;
+  else if(tipo==="salida")res-=qty;
+  else if(tipo==="ajuste")res=qty;
+  const draft={id:"D"+Date.now(),prodIdx:productosPlanos.indexOf(p),prodId:p.id,prodNombre:p.nombre,talla:p.talla,cat:p.cat,tipo,qty,actual:p.exist,resultado:res,fecha:document.getElementById("mov-fecha").value,nota:document.getElementById("mov-nota").value,resp:document.getElementById("mov-resp").value,ts:new Date().toLocaleString("es-MX")};
+  borradores.push(draft);
+  if(API_URL){
+    showLoading("Guardando borrador...");
+    try{await apiPost({action:"addDraft",draft:{id:draft.id,productId:draft.prodId,productName:draft.prodNombre,talla:draft.talla,tipo:draft.tipo,qty:draft.qty,fecha:draft.fecha,nota:draft.nota,responsable:draft.resp,stockActual:draft.actual,stockResult:draft.resultado,timestamp:draft.ts}});}
+    catch(e){toast("Guardado localmente.","warn");}
+    hideLoading();
+  }
+  toast("✓ Borrador guardado. Pendiente de confirmación.","ok");
+  clearForm();renderBorradores();
+}
+async function confirmDraft(i){
+  const d=borradores[i];
+  const p=productosPlanos[d.prodIdx]||productosPlanos.find(x=>x.id===d.prodId);
+  if(!p){toast("Producto no encontrado.","warn");return;}
+  showLoading("Aplicando en Google Sheets...");
+  p.exist=d.resultado;
+  if(p._fil)p._fil[p._side].exist[p._idx]=d.resultado;
+  else if(p._pants)p._pants.exist[p._idx]=d.resultado;
+  else if(p._cam)p._cam.exist[p._idx]=d.resultado;
+  else if(p._man)p._man.exist=d.resultado;
+  else if(p._acc)p._acc.exist=d.resultado;
+  if(API_URL){
+    try{
+      await apiPost({action:"updateProductById",id:d.prodId,existencias:d.resultado,updatedAt:new Date().toISOString()});
+      await apiPost({action:"addMovimiento",mov:{id:"M"+Date.now(),productId:d.prodId,productName:d.prodNombre,talla:d.talla,tipo:d.tipo,qty:d.qty,fecha:d.fecha,nota:d.nota,responsable:d.resp,stockActual:d.actual,stockResult:d.resultado,confirmedAt:new Date().toLocaleString("es-MX")}});
+      await apiPost({action:"deleteDraft",id:d.id});
+    }catch(e){toast("Error en Sheets — cambio aplicado localmente.","warn");}
+  }
+  borradores.splice(i,1);
+  hideLoading();
+  toast(`✓ Stock: ${p.nombre} ${p.talla} → ${p.exist} pzas`,"ok");
+  renderBorradores();renderAlertas();
+  renderFilipinas();renderPants();renderCamisas();renderMandiles();renderAccesorios();
+}
+async function discardDraft(i){
+  const d=borradores[i];
+  if(API_URL){try{await apiPost({action:"deleteDraft",id:d.id});}catch(e){}}
+  borradores.splice(i,1);renderBorradores();toast("Borrador descartado.","warn");
+}
+function clearForm(){["mov-nota","mov-resp","mov-cat","mov-talla-in","mov-actual","mov-result"].forEach(id=>document.getElementById(id).value="");document.getElementById("mov-prod").value="";document.getElementById("mov-qty").value="";}
+
+// ── API ──────────────────────────────────────────────
+async function apiFetch(a,p={}){const r=await fetch(`${API_URL}?${new URLSearchParams({action:a,...p})}`);return r.json();}
+async function apiPost(b){const r=await fetch(API_URL,{method:"POST",body:JSON.stringify(b)});return r.json();}
+
+// ── SETUP & CONN ─────────────────────────────────────
+function connectAPI(){
+  const url=document.getElementById("api-url-input").value.trim();
+  if(!url.includes("script.google.com")){toast("URL no válida.","warn");return;}
+  API_URL=url; localStorage.setItem("inv_api_url",url);
+  document.getElementById("setup-screen").style.display="none";
+  showLoading("Conectando...");
+  apiFetch("getProducts").then(async()=>{
+    try{const d=await apiFetch("getDrafts");if(d.status==="ok"&&d.drafts)d.drafts.forEach(b=>{if(b.id&&!borradores.find(x=>x.id===b.id))borradores.push({id:b.id,prodIdx:-1,prodId:b.productId,prodNombre:b.productName,talla:b.talla,cat:"",tipo:b.tipo,qty:parseInt(b.qty)||0,actual:parseInt(b.stockActual)||0,resultado:parseInt(b.stockResult)||0,fecha:b.fecha,nota:b.nota,resp:b.responsable,ts:b.timestamp});});renderBorradores();}catch(e){}
+    hideLoading();setConn(true);toast("¡Conectado a Google Sheets!","ok");
+  }).catch(()=>{hideLoading();setConn(false);toast("Usando datos locales.","warn");});
+}
+function skipSetup(){document.getElementById("setup-screen").style.display="none";setConn(false);document.getElementById("conn-lbl").textContent="local";document.getElementById("conn-sub").textContent="Datos locales";toast("Usando datos sin conexión.","warn");}
+function setConn(v){document.getElementById("conn-dot").className="conn-dot"+(v?" on":" err");document.getElementById("conn-lbl").textContent=v?"conectado":"sin conexión";document.getElementById("conn-sub").textContent=v?"Google Sheets":"Datos locales";}
+async function syncSheets(){
+  if(!API_URL){toast("Sin conexión configurada.","warn");return;}
+  document.getElementById("conn-lbl").textContent="sincronizando…";
+  showLoading("Comprobando Google Sheets...");
+  try{
+    // 1. Leer productos de Sheets
+    const pd = await apiFetch("getProducts");
+    if(pd.status==="ok"){
+      if(!pd.products || pd.products.length===0){
+        // ── Sheets está VACÍO → subir todos los datos locales ──
+        showLoading("Sheets vacío — subiendo inventario completo...");
+        const total = productosPlanos.length;
+        let done = 0;
+        // Subir en lotes de 50 para no saturar
+        const BATCH = 50;
+        for(let i=0; i<productosPlanos.length; i+=BATCH){
+          const lote = productosPlanos.slice(i, i+BATCH);
+          for(const p of lote){
+            await apiPost({action:"addProduct", product:{
+              id: p.id,
+              codigo: p.id,
+              cat: p.cat,
+              nombre: p.nombre,
+              talla: p.talla,
+              genero: p.genero,
+              existencias: p.exist??0,
+              minimo: p.min??5,
+              imagen: p.imagen||"",
+              notas: p.notas||"",
+              updatedAt: new Date().toISOString()
+            }});
+            done++;
+          }
+          showLoading(`Subiendo datos... ${done}/${total}`);
+        }
+        toast(`✓ ${total} productos subidos a Google Sheets`,"ok");
+      } else {
+        // ── Sheets TIENE datos → actualizar existencias locales ──
+        showLoading("Cargando datos desde Sheets...");
+        let actualizados = 0;
+        pd.products.forEach(p=>{
+          const lp = productosPlanos.find(x=>x.id===String(p.id)||x.id===String(p.codigo));
+          if(lp){
+            lp.exist = parseInt(p.existencias)??lp.exist;
+            lp.min   = parseInt(p.minimo)??lp.min;
+            if(p.imagen) lp.imagen = p.imagen;
+            if(p.notas)  lp.notas  = p.notas;
+            // Propagate to source arrays
+            if(lp._fil)  lp._fil[lp._side].exist[lp._idx] = lp.exist;
+            else if(lp._pants) lp._pants.exist[lp._idx] = lp.exist;
+            else if(lp._cam)   lp._cam.exist[lp._idx]   = lp.exist;
+            else if(lp._man)   lp._man.exist             = lp.exist;
+            else if(lp._acc)   lp._acc.exist             = lp.exist;
+            else if(lp._ins)   lp._ins.stock             = lp.exist;
+            actualizados++;
+          }
+        });
+        toast(`✓ ${actualizados} productos actualizados desde Sheets`,"ok");
+      }
+    }
+    // 2. Cargar borradores
+    try{
+      const dd = await apiFetch("getDrafts");
+      if(dd.status==="ok"&&dd.drafts) dd.drafts.forEach(b=>{
+        if(b.id&&!borradores.find(x=>x.id===b.id)) borradores.push({
+          id:b.id,prodIdx:-1,prodId:b.productId,prodNombre:b.productName,
+          talla:b.talla,cat:"",tipo:b.tipo,qty:parseInt(b.qty)||0,
+          actual:parseInt(b.stockActual)||0,resultado:parseInt(b.stockResult)||0,
+          fecha:b.fecha,nota:b.nota,resp:b.responsable,ts:b.timestamp
+        });
+      });
+      renderBorradores();
+    }catch(e){}
+    setConn(true);
+    hideLoading();
+    renderFilipinas();renderPants();renderCamisas();renderMandiles();renderAccesorios();renderAlertas();
+  }catch(e){
+    hideLoading();setConn(false);
+    toast("Error al sincronizar — revisa la conexión.","err");
+    console.error("syncSheets error:",e);
+  }
+}
+
+// Subir todos los productos locales a Sheets de una vez
+async function uploadAllToSheets(){
+  if(!API_URL){toast("Sin conexión configurada.","warn");return;}
+  if(!confirm(`¿Subir los ${productosPlanos.length} productos a Google Sheets? Esto reemplazará los datos existentes.`))return;
+  showLoading("Subiendo inventario completo...");
+  try{
+    let done=0;
+    for(const p of productosPlanos){
+      await apiPost({action:"addProduct",product:{
+        id:p.id,codigo:p.id,cat:p.cat,nombre:p.nombre,
+        talla:p.talla,genero:p.genero,existencias:p.exist??0,
+        minimo:p.min??5,imagen:p.imagen||"",notas:p.notas||"",
+        updatedAt:new Date().toISOString()
+      }});
+      done++;
+      if(done%50===0) showLoading(`Subiendo... ${done}/${productosPlanos.length}`);
+    }
+    hideLoading();
+    toast(`✓ ${done} productos subidos a Sheets`,"ok");
+    setConn(true);
+  }catch(e){
+    hideLoading();
+    toast("Error al subir datos.","err");
+  }
+}
+
+// ── NAV ───────────────────────────────────────────────
+function showView(name){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  document.getElementById("view-"+name).classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n=>{if((n.getAttribute("onclick")||"").includes("'"+name+"'"))n.classList.add("active");});
+  if(name==="borradores")renderBorradores();
+  if(name==="alertas")renderAlertas();
+  if(name==="resumen")renderResumen();
+}
+
+// ── TOAST & LOADING ───────────────────────────────────
+function toast(msg,type="ok"){const t=document.getElementById("toast");t.className="show "+type;t.innerHTML=(type==="ok"?"✓ ":type==="warn"?"⚠ ":"✕ ")+msg;clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),3000);}
+function showLoading(txt="Procesando…"){document.getElementById("loading-text").textContent=txt;document.getElementById("loading").classList.add("show");}
+function hideLoading(){document.getElementById("loading").classList.remove("show");}
+
+// ── INIT ──────────────────────────────────────────────
+document.getElementById("mov-fecha").value=new Date().toISOString().slice(0,10);
+document.getElementById("mov-qty").addEventListener("input",calcResultado);
+document.getElementById("mov-tipo").addEventListener("change",calcResultado);
+buildProductosPlanos();
+renderFilipinas();renderPants();renderCamisas();renderMandiles();renderAccesorios();renderInsumos();renderAlertas();renderResumen();
+// URL del script hardcodeada — conexión automática
+const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbzaGyAZ1K62Vfzm2Nu3J1wRNDQePWFvakN0_eIMurpIs8BD1yLCZMjKrCZSmcJaCwPihw/exec";
+const savedUrl = localStorage.getItem("inv_api_url") || HARDCODED_URL;
+if(savedUrl){
+  API_URL = savedUrl;
+  localStorage.setItem("inv_api_url", savedUrl);
+  document.getElementById("api-url-input").value = savedUrl;
+  document.getElementById("setup-screen").style.display = "none";
+  showLoading("Conectando con Google Sheets...");
+  apiFetch("getProducts").then(async () => {
+    // Load pending drafts too
+    try {
+      const dd = await apiFetch("getDrafts");
+      if(dd.status==="ok" && dd.drafts) {
+        dd.drafts.forEach(b => {
+          if(b.id && !borradores.find(x=>x.id===b.id)) borradores.push({
+            id:b.id, prodIdx:-1, prodId:b.productId,
+            prodNombre:b.productName, talla:b.talla, cat:"",
+            tipo:b.tipo, qty:parseInt(b.qty)||0,
+            actual:parseInt(b.stockActual)||0,
+            resultado:parseInt(b.stockResult)||0,
+            fecha:b.fecha, nota:b.nota,
+            resp:b.responsable, ts:b.timestamp
+          });
+        });
+        renderBorradores();
+      }
+    } catch(e) {}
+    hideLoading();
+    setConn(true);
+    toast("✓ Conectado a Google Sheets", "ok");
+  }).catch(() => {
+    hideLoading();
+    setConn(false);
+    toast("Sin conexión — usando datos locales.", "warn");
+  });
+}
+</script>
+</body>
+</html>
